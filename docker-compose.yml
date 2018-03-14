@@ -1,0 +1,17 @@
+version: '3'
+services:
+  web:
+    build: .
+    ports:
+     - "5000:5000"
+    volumes:
+     - .:/code
+    links:
+     - db
+  redis:
+    image: "redis:alpine"
+  db:
+    image: mongo:3.0.2
+  
+
+  
