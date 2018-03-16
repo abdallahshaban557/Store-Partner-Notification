@@ -8,42 +8,42 @@ from flask_pushjack import FlaskAPNS
 
 #Path to the push certificate
 config = {
-    'APNS_CERTIFICATE': './Apple_Certificate/newfile.pem>'
-}
-
+    'APNS_CERTIFICATE': "./Apple_Certificate/pushcertificate.pem"
+    }
 
 app = Flask(__name__)
 
 #update app config file with apple push certificate
 app.config.update(config)
+ios = FlaskAPNS()
+ios.init_app(app)
 
 
 
 
 #MongoDB connection URI - It currently uses the hostname of the docker instance
-client = MongoClient('fccd6dd3ab02',27017)
+client = MongoClient('fccd6dd3ab02',27017, serverSelectionTimeoutMS=3000)
 
 #Connection to the DB
 db = client['store_partner_notification']
 
 #Connection to the specific Collections
 notification_records = db['store_partner_notification']
-store_information_records = db['store_information']
+store_information = db['store_information']
 notification_information = db['notification_information']
 
 
 
-def sendpushnotification(pushnotification_token,store_id, dev_prod_flag):
+def sendpushnotification(DeviceToken, OrderID, StoreID, dev_flag):
     #Initiate APNs for the push notification service
-    client = FlaskAPNS()
-    client.init_app(app)
-
+    config.update({"APNS_SANDBOX" : dev_flag})
+    app.config.update(config)
+    
     #Alert body
-    alert = "New BOPUS order is ready"
+    alert = {"Sucess" : True, "Message": "New BOPUS order is ready", "OrderID": OrderID}
     #send the push notification
-    res = client.send(pushnotification_token, alert, sound='default')
-
-    return jsonify({"Success" : True})
+    notification = ios.send(DeviceToken, alert, sound="default")
+    return notification
 
 
 def getallnotificationrecords():
@@ -51,9 +51,9 @@ def getallnotificationrecords():
     notifications = []
     for notification in notification_records.find():
         notifications.append( {
-            "OrderID" : notification['OrderID'],
+            "OrderID" : int(notification['OrderID']),
             "OrderCreationDate" : notification["OrderCreationDate"],
-            "StoreID" : notification["StoreID"],
+            "StoreID" : int(notification["StoreID"]),
             "NotificationCreationDate" : notification["NotificationCreationDate"],
             "ReadReceiptStatus" : notification["ReadReceiptStatus"],
             }
@@ -67,6 +67,8 @@ def hello():
     notification_array = []
     for notification in notification_records.find():
         notification_array.append(notification)
+
+    return jsonify({"Success" :True})
     
 @app.route('/deleteallnotifications', methods = ['DELETE'])
 def deleteallnotifications():
@@ -87,58 +89,81 @@ def getallnotificationrecordsapi():
 def addorder():    
     #change request received through endpoint to JSON
     Payload = request.json
-
     #create the insert object into DB
     BOPUS_Order = {
-            "OrderID" : Payload["OrderID"],
+            "OrderID" : int(Payload["OrderID"]),
             "OrderCreationDate" : Payload["OrderCreationDate"],
-            "StoreID" : Payload["StoreID"],
+            "StoreID" : int(Payload["StoreID"]),
             "NotificationCreationDate" : time.strftime('%x %X'),
             "ReadReceiptStatus" : 0,
     }
     #inset object into MongoDB
     notification_records.insert_one(BOPUS_Order)
-
+    DeviceToken = store_information.find_one({"StoreID" : BOPUS_Order["StoreID"]})
+    sendpushnotification(DeviceToken["DeviceToken"], Payload["OrderID"],Payload["StoreID"], False)
     return jsonify({"Sucess" : True})
 
 #Indicate that the store received the notification
 @app.route('/readnotification', methods=['POST'])
 def readnotification():
-    StoreID = int(request.form["StoreID"])
-    for notification in notification_records.find({"StoreID" : StoreID}):
-        notification["ReadReceiptStatus"] = 1
-        notification_records.save(notification)
-    return 0
-
-#trigger push notifications - incomplete
-@app.route('/sendnotification', methods=['POST'])
-def sendnotification():
-    #turn request to JSON and grab the required variables
     Payload = request.json
-    DeviceToken = Payload["DeviceToken"]
-    StoreID = Payload["StoreID"]
-    dev_prod_flag = bool(Payload["dev_prod_flag"])
-
-    #send notification
-    send = sendpushnotification(DeviceToken, StoreID, dev_prod_flag )
+    StoreID = int(Payload["StoreID"])
+    #OrderID = int(Payload["OrderID"])
     for notification in notification_records.find({"StoreID" : StoreID}):
         notification["ReadReceiptStatus"] = 1
         notification_records.save(notification)
-
-    return jsonify({"Success" : True , "StoreID" : StoreID})
+    return jsonify({"Success" : True})
 
 
 #register device token
-@app.route('/registerdevicetoken', methods=['POST'])
+@app.route('/registerdevice', methods=['POST'])
 def registerdevicetoken():
+    #change request to JSON and grab the required variables
     Payload = request.json
+    DeviceToken = Payload["DeviceToken"]
     StoreID = Payload["StoreID"]
-    for notification in notification_records.find({"StoreID" : StoreID}):
-        notification["ReadReceiptStatus"] = 1
-        notification_records.save(notification)
-    return True
+    #check if the store exists in MongoDB
+    Device_Exists = store_information.find_one({"DeviceToken" : DeviceToken})
+
+    if (Device_Exists != None):
+        store_information.update_many({"DeviceToken" : DeviceToken}, {"$set": {
+            "DeviceToken": DeviceToken,
+            "StoreID":StoreID
+            }
+        })
+    else:
+        store_information.save({"DeviceToken" : DeviceToken, "StoreID" : StoreID})
+
+    return jsonify({"Success" : True})
 
 
+@app.route('/getallregistereddevices', methods=['GET'])
+def getallregistereddevices():
+    #change request to JSON and grab the required variables
+    Registerd_Devices = []
+    for device in store_information.find():
+        Registerd_Devices.append( {
+            "StoreID" : int(device["StoreID"]),
+            "DeviceToken" : device["DeviceToken"]
+            }
+        )
+    return jsonify({"Success" : True , "Payload" : Registerd_Devices})
+
+
+
+@app.route('/deletealldevices', methods=['DELETE'])
+def deletealldevices():
+    #change request to JSON and grab the required variables
+    store_information.delete_many({})
+    return jsonify({"Success" : True})
+
+
+
+@app.route('/sendpushnotification', methods=['POST'])
+def pushnotification():
+    Payload = request.json
+    notification = sendpushnotification(Payload["DeviceToken"], Payload["OrderID"],Payload["StoreID"], Payload["dev_flag"])
+    return jsonify({"Sucess": True, "Payload" : str(notification.tokens)})
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", debug=True)
