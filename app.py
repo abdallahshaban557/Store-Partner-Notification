@@ -1,10 +1,15 @@
 import time
 import json
 from flask import Flask,request,jsonify
+import os
 #MongoDB client
 from pymongo import MongoClient
 #Push notification library
 from flask_pushjack import FlaskAPNS
+
+from apns2.client import APNsClient
+from apns2.payload import Payload
+
 
 #Path to the push certificate
 config = {
@@ -22,7 +27,9 @@ ios.init_app(app)
 
 
 #MongoDB connection URI - It currently uses the hostname of the docker instance
-client = MongoClient('fccd6dd3ab02',27017, serverSelectionTimeoutMS=3000)
+db_host = str(os.environ['db'])
+client = MongoClient(db_host,27017, serverSelectionTimeoutMS=3000)
+
 
 #Connection to the DB
 db = client['store_partner_notification']
@@ -43,7 +50,18 @@ def sendpushnotification(DeviceToken, OrderID, StoreID, dev_flag):
     alert = {"Sucess" : True, "Message": "New BOPUS order is ready", "OrderID": OrderID}
     #send the push notification
     notification = ios.send(DeviceToken, alert, sound="default")
-    return notification
+    
+    
+    
+    token_hex = DeviceToken
+    payload = Payload(alert="Hello World!", sound="default", badge=1)
+    topic = 'com.petco.notifications'
+    client1 = APNsClient('./Apple_Certificate/server.pem', use_sandbox=True, use_alternative_port=False)
+    client1.send_notification(token_hex, payload, topic)
+    
+    
+    
+    return True
 
 
 def getallnotificationrecords():
@@ -100,7 +118,7 @@ def addorder():
     #inset object into MongoDB
     notification_records.insert_one(BOPUS_Order)
     DeviceToken = store_information.find_one({"StoreID" : BOPUS_Order["StoreID"]})
-    sendpushnotification(DeviceToken["DeviceToken"], Payload["OrderID"],Payload["StoreID"], False)
+    #sendpushnotification(DeviceToken["DeviceToken"], Payload["OrderID"],Payload["StoreID"], False)
     return jsonify({"Sucess" : True})
 
 #Indicate that the store received the notification
@@ -150,7 +168,6 @@ def getallregistereddevices():
     return jsonify({"Success" : True , "Payload" : Registerd_Devices})
 
 
-
 @app.route('/deletealldevices', methods=['DELETE'])
 def deletealldevices():
     #change request to JSON and grab the required variables
@@ -163,7 +180,7 @@ def deletealldevices():
 def pushnotification():
     Payload = request.json
     notification = sendpushnotification(Payload["DeviceToken"], Payload["OrderID"],Payload["StoreID"], Payload["dev_flag"])
-    return jsonify({"Sucess": True, "Payload" : str(notification.tokens)})
+    return jsonify({"Sucess": True, "Payload" : str(notification)})
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", debug=True)
