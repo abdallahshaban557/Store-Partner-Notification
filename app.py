@@ -1,6 +1,7 @@
 import time
 import json
-from flask import Flask,request,jsonify
+from flask import Flask,request, Response,jsonify
+from functools import wraps
 import os
 #MongoDB client
 from pymongo import MongoClient
@@ -26,9 +27,38 @@ ios.init_app(app)
 
 
 
+
+
+def check_auth(username, password):
+    return username == 'petco' and password == 'petco123'
+
+def authenticate():
+    return Response(
+    'Could not verify your access level for that URL.\n'
+    'You have to login with proper credentials', 401,
+    {'WWW-Authenticate': 'Basic realm="Login Required"'})
+
+def requires_auth(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        auth = request.authorization
+        if not auth or not check_auth(auth.username, auth.password):
+            return authenticate()
+        return f(*args, **kwargs)
+    return decorated
+
+
+
+
+
+
 #MongoDB connection URI - It currently uses the hostname of the docker instance
 db_host = str(os.environ['db'])
-client = MongoClient(db_host,27017, serverSelectionTimeoutMS=3000)
+db_port = os.environ['db_port']
+if db_port == "":
+    client = MongoClient(db_host, serverSelectionTimeoutMS=3000)
+else:
+    client = MongoClient(db_host, int(db_port),serverSelectionTimeoutMS=3000)
 
 
 #Connection to the DB
@@ -81,6 +111,7 @@ def getallnotificationrecords():
 
 
 @app.route('/')
+@requires_auth
 def hello():
     notification_array = []
     for notification in notification_records.find():
@@ -89,6 +120,7 @@ def hello():
     return jsonify({"Success" :True})
     
 @app.route('/deleteallnotifications', methods = ['DELETE'])
+@requires_auth
 def deleteallnotifications():
     notification_records.delete_many({})
     return jsonify({"Success" : True})
@@ -96,6 +128,7 @@ def deleteallnotifications():
 
 #endpoint to get all of the notifications in MongoDB
 @app.route('/getallnotificationrecords')
+@requires_auth
 def getallnotificationrecordsapi():
     allnotifications = getallnotificationrecords()
     return jsonify(allnotifications)
@@ -104,6 +137,7 @@ def getallnotificationrecordsapi():
 
 #New order submitted from OMS
 @app.route('/addorder', methods=['POST'])
+@requires_auth
 def addorder():    
     #change request received through endpoint to JSON
     Payload = request.json
@@ -123,6 +157,7 @@ def addorder():
 
 #Indicate that the store received the notification
 @app.route('/readnotification', methods=['POST'])
+@requires_auth
 def readnotification():
     Payload = request.json
     StoreID = int(Payload["StoreID"])
@@ -135,6 +170,7 @@ def readnotification():
 
 #register device token
 @app.route('/registerdevice', methods=['POST'])
+@requires_auth
 def registerdevicetoken():
     #change request to JSON and grab the required variables
     Payload = request.json
@@ -156,6 +192,7 @@ def registerdevicetoken():
 
 
 @app.route('/getallregistereddevices', methods=['GET'])
+@requires_auth
 def getallregistereddevices():
     #change request to JSON and grab the required variables
     Registerd_Devices = []
@@ -169,6 +206,7 @@ def getallregistereddevices():
 
 
 @app.route('/deletealldevices', methods=['DELETE'])
+@requires_auth
 def deletealldevices():
     #change request to JSON and grab the required variables
     store_information.delete_many({})
@@ -177,6 +215,7 @@ def deletealldevices():
 
 
 @app.route('/sendpushnotification', methods=['POST'])
+@requires_auth
 def pushnotification():
     Payload = request.json
     notification = sendpushnotification(Payload["DeviceToken"], Payload["OrderID"],Payload["StoreID"], Payload["dev_flag"])
