@@ -77,20 +77,12 @@ def sendpushnotification(DeviceToken, OrderID, StoreID, dev_flag):
     app.config.update(config)
     
     #Alert body
-    alert = {"Sucess" : True, "Message": "New BOPUS order is ready", "OrderID": OrderID}
+    alert = {"Sucess" : True, "Message": "New BOPUS order is ready", "OrderID": OrderID, "StoreID" : StoreID}
     #send the push notification
-    notification = ios.send(DeviceToken, alert, sound="default")
-    
-    
-    
-    token_hex = DeviceToken
-    payload = Payload(alert="Hello World!", sound="default", badge=1)
+    payload = Payload(alert= alert, sound="default", badge=1)
     topic = 'com.petco.notifications'
-    client1 = APNsClient('./Apple_Certificate/server.pem', use_sandbox=True, use_alternative_port=False)
-    client1.send_notification(token_hex, payload, topic)
-    
-    
-    
+    IOS_Client = APNsClient('./Apple_Certificate/server.pem', use_sandbox=dev_flag, use_alternative_port=False)
+    IOS_Client.send_notification(DeviceToken, payload, topic)
     return True
 
 
@@ -151,8 +143,9 @@ def addorder():
     }
     #inset object into MongoDB
     notification_records.insert_one(BOPUS_Order)
-    DeviceToken = store_information.find_one({"StoreID" : BOPUS_Order["StoreID"]})
-    #sendpushnotification(DeviceToken["DeviceToken"], Payload["OrderID"],Payload["StoreID"], False)
+    #DeviceToken = store_information.find_one({"StoreID" : BOPUS_Order["StoreID"]})
+    for Device in store_information.find({"StoreID" : BOPUS_Order["StoreID"]}):
+        sendpushnotification(Device["DeviceToken"], Payload["OrderID"],Payload["StoreID"], Payload["dev_flag"])
     return jsonify({"Sucess" : True})
 
 #Indicate that the store received the notification
@@ -218,8 +211,8 @@ def deletealldevices():
 @requires_auth
 def pushnotification():
     Payload = request.json
-    notification = sendpushnotification(Payload["DeviceToken"], Payload["OrderID"],Payload["StoreID"], Payload["dev_flag"])
-    return jsonify({"Sucess": True, "Payload" : str(notification)})
+    sendpushnotification(Payload["DeviceToken"], Payload["OrderID"],Payload["StoreID"], Payload["dev_flag"])
+    return jsonify({"Sucess": True})
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", debug=True)
