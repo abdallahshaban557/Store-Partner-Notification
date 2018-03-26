@@ -5,7 +5,7 @@ from functools import wraps
 #Push notification library
 from apns2.client import APNsClient
 from apns2.payload import Payload
-#DynamoDB client
+#DynamoDB clientt
 import boto3
 from boto3.dynamodb.conditions import Key, Attr
 #Needed to create primary hashed key for the dynamodb items
