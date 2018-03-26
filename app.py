@@ -16,7 +16,7 @@ app = Flask(__name__)
 
 #Checks username and password
 def check_auth(username, password):
-    return username == 'petco1' and password == 'petco123'
+    return username == 'petco' and password == 'petco123'
 #Returns if authenticated or not
 def authenticate():
     return Response(
