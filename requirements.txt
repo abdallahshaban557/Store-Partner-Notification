@@ -1,6 +1,5 @@
-pymongo <= 3.6.1
-flask
-redis
-Flask-Pushjack
-apns2
+flask<=0.12.2
+apns2<=0.3.0
+boto3<=1.6.14
+pyopenssl<=17.5.0
 
