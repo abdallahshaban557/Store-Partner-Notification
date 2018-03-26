@@ -5,7 +5,7 @@ from functools import wraps
 #Push notification library
 from apns2.client import APNsClient
 from apns2.payload import Payload
-#DynamoDB clientt
+#DynamoDB client
 import boto3
 from boto3.dynamodb.conditions import Key, Attr
 #Needed to create primary hashed key for the dynamodb items
@@ -16,7 +16,7 @@ app = Flask(__name__)
 
 #Checks username and password
 def check_auth(username, password):
-    return username == 'petco1' and password == 'petco123'
+    return username == 'petco' and password == 'petco123'
 #Returns if authenticated or not
 def authenticate():
     return Response(
