@@ -53,7 +53,6 @@ def sendpushnotification(DeviceToken, OrderID, StoreID, dev_flag):
 
 
 @app.route('/')
-@requires_auth
 def hello():
     return jsonify({"Success" :True})
     
@@ -87,7 +86,7 @@ def getallnotificationrecords():
 
 
 #New order submitted from OMS
-@app.route('/addorder1', methods=['POST'])
+@app.route('/addorder', methods=['POST'])
 @requires_auth
 def addorder():    
     #change request received through endpoint to JSON
