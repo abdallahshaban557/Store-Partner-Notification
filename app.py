@@ -42,10 +42,8 @@ notification_records = client.Table('store_partner_notification')
 store_information = client.Table('store_information')
 
 def sendpushnotification(DeviceToken, OrderID, StoreID, dev_flag):
-    #Alert body
-    alert = {"Sucess" : True, "Message": "New BOPUS order is ready", "OrderID": OrderID, "StoreID" : StoreID}
     #send the push notification
-    payload = Payload(alert= alert, sound="default", badge=1)
+    payload = Payload(alert= "New BOPUS order is ready", sound="default", badge=1)
     topic = 'com.petco.notifications'
     IOS_Client = APNsClient('./Apple_Certificate/server.pem', use_sandbox= dev_flag, use_alternative_port=False)
     IOS_Client.send_notification(DeviceToken, payload, topic)
