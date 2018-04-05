@@ -73,7 +73,7 @@ def getallnotificationrecords():
     Notifications_Search = notification_records.scan() 
     for notification in Notifications_Search["Items"]:
         notifications.append({
-            "OrderID" : int(notification["OrderID"]),
+            "OrderID" : notification["OrderID"],
             "OrderCreationDate" : notification["OrderCreationDate"],
             "StoreID" : int(notification["StoreID"]),
             "NotificationCreationDate" : notification["NotificationCreationDate"],
@@ -92,7 +92,7 @@ def addorder():
     #create the insert object into DB
     BOPUS_Order = {
                 "ID" : uuid.uuid4().hex,
-                "OrderID" : int(Payload["OrderID"]),
+                "OrderID" : Payload["OrderID"],
                 "OrderCreationDate" : Payload["OrderCreationDate"],
                 "StoreID" : int(Payload["StoreID"]),
                 "NotificationCreationDate" : time.strftime('%x %X'),
