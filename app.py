@@ -10,9 +10,38 @@ import boto3
 from boto3.dynamodb.conditions import Key, Attr
 #Needed to create primary hashed key for the dynamodb items
 import uuid
+from flask_apscheduler import APScheduler
 
 app = Flask(__name__)
 
+#Configuration for the queue for resending notification
+class Config(object):
+    JOBS = [
+        {
+            'id': 'job1',
+            'func': 'app:resend_notification',
+            'trigger': 'interval',
+            'seconds': 900
+        }
+    ]
+    SCHEDULER_API_ENABLED = True
+
+#The function responsible for scanning through the BOPUS orders, and sending a reminder notification
+def resend_notification():    
+    Overdue_Notifications = notification_records.scan( FilterExpression=Attr('ReadReceiptStatus').eq(0) )
+    Pending_Store_Orders = []
+    for notification in Overdue_Notifications['Items']:
+        if(notification["StoreID"] in Pending_Store_Orders):
+            continue
+        else:
+            Pending_Store_Orders.append(notification["StoreID"])
+    for Pending_Stores in Pending_Store_Orders:
+        print(Pending_Stores)
+        All_Devices = store_information.scan( FilterExpression=Attr('StoreID').eq(Pending_Stores))
+        for Device in All_Devices['Items']:
+            sendpushnotification(Device["DeviceToken"], "Reminder" ,Pending_Stores, 1)
+            
+      
 
 #Checks username and password
 def check_auth(username, password):
@@ -33,7 +62,6 @@ def requires_auth(f):
         return f(*args, **kwargs)
     return decorated
 
-
 #DynamoDB connection
 client = boto3.resource('dynamodb')
 
@@ -49,7 +77,6 @@ def sendpushnotification(DeviceToken, OrderID, StoreID, dev_flag):
     IOS_Client.send_notification(DeviceToken, payload, topic)
     return True
 
-
 @app.route('/')
 def hello():
     return jsonify({"Success" :True})
@@ -63,7 +90,6 @@ def deleteallnotifications():
             "ID" : notification["ID"]
         })
     return jsonify({"Success" : True})
-
 
 #endpoint to get all of the notifications in DynamoDB
 @app.route('/getallnotificationrecords')
@@ -81,7 +107,6 @@ def getallnotificationrecords():
             }
         )
     return jsonify({"Success" : True , "Payload" : notifications})
-
 
 #New order submitted from OMS
 @app.route('/addorder', methods=['POST'])
@@ -104,10 +129,8 @@ def addorder():
     #Find all devices attached to the specified store, and send notification - Try/except to skip if a notification error occurs
     for Device in response['Items']:
         sendpushnotification(Device["DeviceToken"], Payload["OrderID"],Payload["StoreID"], Payload["dev_flag"])
-    
+    print("test")
     return jsonify({"Success" : True})    
-
-
 
 #Indicate that the store received the notification
 @app.route('/readnotification', methods=['POST'])
@@ -115,12 +138,8 @@ def addorder():
 def readnotification():
     Payload = request.json
     StoreID = int(Payload["StoreID"])
-
     Notification_Search = notification_records.scan( FilterExpression=Attr('StoreID').eq(StoreID))    
-
-    for notification in Notification_Search["Items"]:
-    
-        
+    for notification in Notification_Search["Items"]:      
         notification_records.update_item(
             Key= {
                 "ID" : notification["ID"]
@@ -129,9 +148,7 @@ def readnotification():
         ExpressionAttributeValues={
             ':val1': 1
         })
-
     return jsonify({"Success" : True})
-
 
 #register device token
 @app.route('/registerdevice', methods=['POST'])
@@ -156,10 +173,8 @@ def registerdevicetoken():
         ExpressionAttributeValues={
             ':val1': StoreID
         }
-        )
-    
+        )   
     return jsonify({"Success" : True})
-
 
 @app.route('/getallregistereddevices', methods=['GET'])
 @requires_auth
@@ -176,18 +191,14 @@ def getallregistereddevices():
         )
     return jsonify({"Success" : True , "Payload" : Registerd_Devices})
 
-
 @app.route('/deletealldevices', methods=['DELETE'])
 @requires_auth
 def deletealldevices():
     #change request to JSON and grab the required variables
     response = store_information.scan()
-
     for device in response['Items']:
-        store_information.delete_item(Key={"ID" : device["ID"]})
-       
+        store_information.delete_item(Key={"ID" : device["ID"]})     
     return jsonify({"Success" : True})
-
 
 @app.route('/sendpushnotification', methods=['POST'])
 @requires_auth
@@ -197,4 +208,10 @@ def pushnotification():
     return jsonify({"Sucess": True})
 
 if __name__ == "__main__":
+    #Configure the queue for resending notifications
+    app.config.from_object(Config())
+    scheduler = APScheduler()
+    scheduler.init_app(app)
+    scheduler.start()
+    #Running the flask app
     app.run(host="0.0.0.0", ssl_context='adhoc',debug=True) 
