@@ -21,7 +21,7 @@ class Config(object):
             'id': 'job1',
             'func': 'app:resend_notification',
             'trigger': 'interval',
-            'seconds': 900
+            'seconds': 300
         }
     ]
     SCHEDULER_API_ENABLED = True
@@ -36,13 +36,12 @@ def resend_notification():
         else:
             Pending_Store_Orders.append(notification["StoreID"])
     for Pending_Stores in Pending_Store_Orders:
-        print(Pending_Stores)
+        print(Pending_Store_Orders)
         All_Devices = store_information.scan( FilterExpression=Attr('StoreID').eq(Pending_Stores))
         for Device in All_Devices['Items']:
-            sendpushnotification(Device["DeviceToken"], "Reminder" ,Pending_Stores, 1)
+            print(Device)
+            sendpushnotification(Device["DeviceToken"], "Reminder" , 0, 0)
             
-      
-
 #Checks username and password
 def check_auth(username, password):
     return username == 'petco' and password == 'petco123'
@@ -71,7 +70,8 @@ store_information = client.Table('store_information')
 
 def sendpushnotification(DeviceToken, OrderID, StoreID, dev_flag):
     #send the push notification
-    payload = Payload(alert= "New BOPUS order is ready", sound="default", badge=1)
+    custom = {'launchURL': 'x-com.petco.wrapper.sim-sit://launch' }
+    payload = Payload(alert= "New BOPUS order is ready", sound="popcorn.wav", badge=1, custom=custom)
     topic = 'com.petco.notifications'
     IOS_Client = APNsClient('./Apple_Certificate/server.pem', use_sandbox= dev_flag, use_alternative_port=False)
     IOS_Client.send_notification(DeviceToken, payload, topic)
@@ -128,7 +128,7 @@ def addorder():
     response = store_information.scan( FilterExpression=Attr('StoreID').eq(Payload["StoreID"]) )
     #Find all devices attached to the specified store, and send notification - Try/except to skip if a notification error occurs
     for Device in response['Items']:
-        sendpushnotification(Device["DeviceToken"], Payload["OrderID"],Payload["StoreID"], Payload["dev_flag"])
+        sendpushnotification(Device["DeviceToken"], Payload["OrderID"],Payload["StoreID"], False)
     print("test")
     return jsonify({"Success" : True})    
 
@@ -214,4 +214,4 @@ if __name__ == "__main__":
     scheduler.init_app(app)
     scheduler.start()
     #Running the flask app
-    app.run(host="0.0.0.0", ssl_context='adhoc',debug=True) 
+    app.run(host="0.0.0.0", ssl_context='adhoc') 
