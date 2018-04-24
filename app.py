@@ -70,7 +70,7 @@ store_information = client.Table('store_information')
 
 def sendpushnotification(DeviceToken, OrderID, StoreID, dev_flag):
     #send the push notification
-    custom = {'launchURL': 'x-com.petco.wrapper.sim-sit://launch' }
+    custom = {'launchURL': 'x-com.petco.wrapper.sim://launch' }
     payload = Payload(alert= "New BOPUS order is ready", sound="popcorn.wav", badge=1, custom=custom)
     topic = 'com.petco.notifications'
     IOS_Client = APNsClient('./Apple_Certificate/server.pem', use_sandbox= dev_flag, use_alternative_port=False)
