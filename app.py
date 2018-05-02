@@ -159,7 +159,7 @@ def registerdevicetoken():
     DeviceToken = Payload["DeviceToken"]
     StoreID = Payload["StoreID"]
     #check if the store exists in MongoDB
-    Device_Search = store_information.scan( FilterExpression=Attr('DeviceToken').eq(DeviceToken),Limit=5)    
+    Device_Search = store_information.scan( FilterExpression=Attr('DeviceToken').eq(DeviceToken))    
   
     if (Device_Search["Count"] == 0):
         store_information.put_item(Item = {"ID" : uuid.uuid4().hex, "DeviceToken" : DeviceToken, "StoreID" : StoreID})
