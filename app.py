@@ -127,9 +127,10 @@ def addorder():
     notification_records.put_item(Item = BOPUS_Order)
     response = store_information.scan( FilterExpression=Attr('StoreID').eq(Payload["StoreID"]) )
     #Find all devices attached to the specified store, and send notification - Try/except to skip if a notification error occurs
-    for Device in response['Items']:
-        sendpushnotification(Device["DeviceToken"], Payload["OrderID"],Payload["StoreID"], False)
-    print("test")
+    print(Payload["dev_flag"])
+    if Payload["dev_flag"] == False:
+        for Device in response['Items']:
+            sendpushnotification(Device["DeviceToken"], Payload["OrderID"],Payload["StoreID"], False)
     return jsonify({"Success" : True})    
 
 #Indicate that the store received the notification
