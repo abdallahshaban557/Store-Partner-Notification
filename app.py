@@ -123,8 +123,9 @@ def addorder():
                 "NotificationCreationDate" : time.strftime('%x %X'),
                 "ReadReceiptStatus" : 0,
     }
-    #inset object into MongoDB
-    notification_records.put_item(Item = BOPUS_Order)
+    #inset object into Dynamodb
+    if Payload["dev_flag"] == False:
+        notification_records.put_item(Item = BOPUS_Order)
     response = store_information.scan( FilterExpression=Attr('StoreID').eq(Payload["StoreID"]) )
     #Find all devices attached to the specified store, and send notification - Try/except to skip if a notification error occurs
     print(Payload["dev_flag"])
