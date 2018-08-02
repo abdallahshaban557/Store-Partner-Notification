@@ -36,11 +36,21 @@ def resend_notification():
         else:
             Pending_Store_Orders.append(notification["StoreID"])
     for Pending_Stores in Pending_Store_Orders:
-        print(Pending_Store_Orders)
         All_Devices = store_information.scan( FilterExpression=Attr('StoreID').eq(Pending_Stores))
         for Device in All_Devices['Items']:
-            print(Device)
-            sendpushnotification(Device["DeviceToken"], "Reminder" , 0, 0)
+            try:    
+                #print('Sending Notification')
+                print("Sending")
+                sendpushnotification(Device["DeviceToken"], "Reminder" , 0, 0)
+            except:
+                print("ERROR Sending")
+                store_information.delete_item(
+                    Key={
+                    "ID" : Device["ID"] 
+                    }
+                )
+                pass
+            
             
 #Checks username and password
 def check_auth(username, password):
@@ -84,7 +94,7 @@ def hello():
 @app.route('/deleteallnotifications', methods = ['DELETE'])
 @requires_auth
 def deleteallnotifications():
-    Notifications_Search = notification_records.scan()
+    Notifications_Search = notification_records.scan( FilterExpression=Attr('ReadReceiptStatus').eq(1))
     for notification in Notifications_Search["Items"]:
         notification_records.delete_item(Key = {
             "ID" : notification["ID"]
@@ -130,7 +140,10 @@ def addorder():
     #Find all devices attached to the specified store, and send notification - Try/except to skip if a notification error occurs
     if Payload["dev_flag"] == False:
         for Device in response['Items']:
-            sendpushnotification(Device["DeviceToken"], Payload["OrderID"],Payload["StoreID"], False)
+            try:
+                sendpushnotification(Device["DeviceToken"], Payload["OrderID"],Payload["StoreID"], False)
+            except:
+                pass
     return jsonify({"Success" : True})    
 
 #Indicate that the store received the notification
