@@ -64,7 +64,7 @@ def requires_auth(f):
 #DynamoDB connection
 client = boto3.resource('dynamodb')
 
-#Connection to the specific Tables
+#Connection to the specific Tables  
 notification_records = client.Table('store_partner_notification')
 store_information = client.Table('store_information')
 
@@ -128,7 +128,6 @@ def addorder():
         notification_records.put_item(Item = BOPUS_Order)
     response = store_information.scan( FilterExpression=Attr('StoreID').eq(Payload["StoreID"]) )
     #Find all devices attached to the specified store, and send notification - Try/except to skip if a notification error occurs
-    print(Payload["dev_flag"])
     if Payload["dev_flag"] == False:
         for Device in response['Items']:
             sendpushnotification(Device["DeviceToken"], Payload["OrderID"],Payload["StoreID"], False)
@@ -208,6 +207,36 @@ def pushnotification():
     Payload = request.json
     sendpushnotification(Payload["DeviceToken"], Payload["OrderID"],Payload["StoreID"], Payload["dev_flag"])
     return jsonify({"Sucess": True})
+
+#Finds all of the registered devices for a store
+@app.route('/CheckRegisteredDevices/<int:StoreID>', methods=['GET'])
+@requires_auth
+def CheckRegisteredDevices(StoreID):
+    Registerd_Devices = []
+    Devices = store_information.scan(FilterExpression=Attr('StoreID').eq(StoreID) )
+    for device in Devices["Items"]:
+        Registerd_Devices.append( {
+            "StoreID" : int(device["StoreID"]),
+            "DeviceToken" : device["DeviceToken"]
+            }
+        )
+    return jsonify({"Success" : True , "Payload" : Registerd_Devices})
+
+#Find alerts that have not been acknowledged in a store
+@app.route('/CheckUnreadAlerts/<int:StoreID>', methods=['GET'])
+@requires_auth
+def CheckUnreadAlerts(StoreID):
+    Unread_Alerts = []
+    Alerts = notification_records.scan(FilterExpression=Attr('StoreID').eq(StoreID) & Attr('ReadReceiptStatus').eq(0))
+    for Alert in Alerts["Items"]:
+        Unread_Alerts.append( {
+            "OrderID" : Alert["OrderID"],
+            "ReadReceiptStatus" : int(Alert["ReadReceiptStatus"])
+            }
+        )
+    print(Unread_Alerts)
+    return jsonify({"Success" : True , "Payload" :  Unread_Alerts})
+
 
 if __name__ == "__main__":
     #Configure the queue for resending notifications
