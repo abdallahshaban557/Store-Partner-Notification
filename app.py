@@ -91,10 +91,21 @@ def sendpushnotification(DeviceToken, OrderID, StoreID, dev_flag):
 def hello():
     return jsonify({"Success" :True})
     
+@app.route('/deleteallreadnotifications', methods = ['DELETE'])
+@requires_auth
+def deleteallreadnotifications():
+    Notifications_Search = notification_records.scan( FilterExpression=Attr('ReadReceiptStatus').eq(1))
+    for notification in Notifications_Search["Items"]:
+        notification_records.delete_item(Key = {
+            "ID" : notification["ID"]
+        })
+    return jsonify({"Success" : True})
+
+
 @app.route('/deleteallnotifications', methods = ['DELETE'])
 @requires_auth
 def deleteallnotifications():
-    Notifications_Search = notification_records.scan( FilterExpression=Attr('ReadReceiptStatus').eq(1))
+    Notifications_Search = notification_records.scan()
     for notification in Notifications_Search["Items"]:
         notification_records.delete_item(Key = {
             "ID" : notification["ID"]
@@ -154,14 +165,19 @@ def readnotification():
     StoreID = int(Payload["StoreID"])
     Notification_Search = notification_records.scan( FilterExpression=Attr('StoreID').eq(StoreID))    
     for notification in Notification_Search["Items"]:      
-        notification_records.update_item(
+        # notification_records.update_item(
+        #     Key= {
+        #         "ID" : notification["ID"]
+        #     },
+        #     UpdateExpression='SET ReadReceiptStatus = :val1',
+        # ExpressionAttributeValues={
+        #     ':val1': 1
+        # })
+        notification_records.delete_item(
             Key= {
                 "ID" : notification["ID"]
-            },
-            UpdateExpression='SET ReadReceiptStatus = :val1',
-        ExpressionAttributeValues={
-            ':val1': 1
-        })
+            }
+        )
     return jsonify({"Success" : True})
 
 #register device token
@@ -247,7 +263,6 @@ def CheckUnreadAlerts(StoreID):
             "ReadReceiptStatus" : int(Alert["ReadReceiptStatus"])
             }
         )
-    print(Unread_Alerts)
     return jsonify({"Success" : True , "Payload" :  Unread_Alerts})
 
 
