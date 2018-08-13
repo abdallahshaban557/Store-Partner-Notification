@@ -15,16 +15,16 @@ from flask_apscheduler import APScheduler
 app = Flask(__name__)
 
 #Configuration for the queue for resending notification
-class Config(object):
-    JOBS = [
-        {
-            'id': 'job1',
-            'func': 'app:resend_notification',
-            'trigger': 'interval',
-            'seconds': 300
-        }
-    ]
-    SCHEDULER_API_ENABLED = True
+# class Config(object):
+#     JOBS = [
+#         {
+#             'id': 'job1',
+#             'func': 'app:resend_notification',
+#             'trigger': 'interval',
+#             'seconds': 300
+#         }
+#     ]
+#     SCHEDULER_API_ENABLED = True
 
 #The function responsible for scanning through the BOPUS orders, and sending a reminder notification
 def resend_notification():    
@@ -144,9 +144,10 @@ def addorder():
                 "NotificationCreationDate" : time.strftime('%x %X'),
                 "ReadReceiptStatus" : 0,
     }
-    #inset object into Dynamodb
-    if Payload["dev_flag"] == False:
-        notification_records.put_item(Item = BOPUS_Order)
+    #inset object into Dynamodb - commented out based on requirement from store Ops
+    # if Payload["dev_flag"] == False:
+    #     notification_records.put_item(Item = BOPUS_Order)
+
     response = store_information.scan( FilterExpression=Attr('StoreID').eq(Payload["StoreID"]) )
     #Find all devices attached to the specified store, and send notification - Try/except to skip if a notification error occurs
     if Payload["dev_flag"] == False:
@@ -268,9 +269,12 @@ def CheckUnreadAlerts(StoreID):
 
 if __name__ == "__main__":
     #Configure the queue for resending notifications
-    app.config.from_object(Config())
-    scheduler = APScheduler()
-    scheduler.init_app(app)
-    scheduler.start()
+    # app.config.from_object(Config())
+    # scheduler = APScheduler()
+    # scheduler.init_app(app)
+    # scheduler.start()
+
+
+
     #Running the flask app
     app.run(host="0.0.0.0", ssl_context='adhoc') 
