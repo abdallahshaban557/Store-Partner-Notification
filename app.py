@@ -72,7 +72,8 @@ def requires_auth(f):
     return decorated
 
 #DynamoDB connection
-client = boto3.resource('dynamodb')
+client = boto3.resource('dynamodb', region_name='us-east-1')
+
 
 #Connection to the specific Tables  
 notification_records = client.Table('store_partner_notification')
@@ -83,7 +84,7 @@ def sendpushnotification(DeviceToken, OrderID, StoreID, dev_flag):
     custom = {'launchURL': 'x-com.petco.wrapper.sim://launch' }
     payload = Payload(alert= "New BOPUS order is ready", sound="popcorn.wav", badge=1, custom=custom)
     topic = 'com.petco.notifications'
-    IOS_Client = APNsClient('./Apple_Certificate/server.pem', use_sandbox= dev_flag, use_alternative_port=False)
+    IOS_Client = APNsClient('./Apple_Certificate/server1.pem', use_sandbox= dev_flag, use_alternative_port=False)
     IOS_Client.send_notification(DeviceToken, payload, topic)
     return True
 
