@@ -1,6 +1,8 @@
 import time
 import json
 from flask import Flask,request, Response,jsonify
+import requests
+from requests.auth import HTTPBasicAuth
 from functools import wraps
 #Push notification library
 from apns2.client import APNsClient
@@ -71,10 +73,27 @@ store_information = client.Table('store_information')
 def sendpushnotification(DeviceToken, OrderID, StoreID, dev_flag):
     #send the push notification
     custom = {'launchURL': 'x-com.petco.wrapper.sim://launch' }
-    payload = Payload(alert= "New BOPUS order is ready", sound="popcorn.wav", badge=1, custom=custom)
+    payload = Payload(alert= "New BOPUS order is ready", sound="popcorn.wav", badge=0, custom=custom)
     topic = 'com.petco.notifications'
-    IOS_Client = APNsClient('./Apple_Certificate/server.pem', use_sandbox= dev_flag, use_alternative_port=False)
+    IOS_Client = APNsClient('./Apple_Certificate/server1.pem', use_sandbox= dev_flag, use_alternative_port=False)
     IOS_Client.send_notification(DeviceToken, payload, topic)
+    return True
+
+def sendtheatro(StoreID, OrderID, Dev_Flag, TimeStamp):
+    #send request to SXSW notification service
+    url = 'https://0dcetbmqm9.execute-api.us-east-1.amazonaws.com/prod/addorder'
+    PARAMS = {
+        'Content-Type' : 'application/json'
+    }
+
+    Body = {
+        'StoreID' : StoreID,
+        'OrderID' : OrderID,
+        'dev_flag' : Dev_Flag,
+        'OrderCreationDate' : TimeStamp
+    }
+    r = requests.post(url, headers = PARAMS, data = json.dumps(Body), auth = HTTPBasicAuth('notificationservice', 'PtQL[B3qn4y7GuWDfK;zN7Ee9gPu'))
+    print(Body)
     return True
 
 @app.route('/')
@@ -129,8 +148,11 @@ def addorder():
     response = store_information.scan( FilterExpression=Attr('StoreID').eq(Payload["StoreID"]) )
     #Find all devices attached to the specified store, and send notification - Try/except to skip if a notification error occurs
     if Payload["dev_flag"] == False:
-        for Device in response['Items']:
+        for Device in response['Items']: 
             sendpushnotification(Device["DeviceToken"], Payload["OrderID"],Payload["StoreID"], False)
+            print("test")
+    print(Payload)
+    sendtheatro(Payload["StoreID"],Payload["OrderID"], Payload["dev_flag"], Payload["OrderCreationDate"])        
     return jsonify({"Success" : True})    
 
 #Indicate that the store received the notification
