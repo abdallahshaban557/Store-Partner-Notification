@@ -173,8 +173,8 @@ def addorder():
     if Payload["dev_flag"] == False:
         for Device in response['Items']: 
             sendpushnotification(Device["DeviceToken"], Payload["OrderID"],Payload["StoreID"], False)
-            print("test")
-    print(Payload)
+            
+  
     sendtheatro(Payload["StoreID"],Payload["OrderID"], Payload["dev_flag"], Payload["OrderCreationDate"])        
     return jsonify({"Success" : True})    
 
