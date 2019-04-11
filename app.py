@@ -17,16 +17,16 @@ from flask_apscheduler import APScheduler
 app = Flask(__name__)
 
 #Configuration for the queue for resending notification
-class Config(object):
-    JOBS = [
-        {
-            'id': 'job1',
-            'func': 'app:resend_notification',
-            'trigger': 'interval',
-            'seconds': 300
-        }
-    ]
-    SCHEDULER_API_ENABLED = True
+# class Config(object):
+#     JOBS = [
+#         {
+#             'id': 'job1',
+#             'func': 'app:resend_notification',
+#             'trigger': 'interval',
+#             'seconds': 300
+#         }
+#     ]
+#     SCHEDULER_API_ENABLED = True
 
 #The function responsible for scanning through the BOPUS orders, and sending a reminder notification
 def resend_notification():    
@@ -38,11 +38,21 @@ def resend_notification():
         else:
             Pending_Store_Orders.append(notification["StoreID"])
     for Pending_Stores in Pending_Store_Orders:
-        print(Pending_Store_Orders)
         All_Devices = store_information.scan( FilterExpression=Attr('StoreID').eq(Pending_Stores))
         for Device in All_Devices['Items']:
-            print(Device)
-            sendpushnotification(Device["DeviceToken"], "Reminder" , 0, 0)
+            try:    
+                #print('Sending Notification')
+                print("Sending")
+                sendpushnotification(Device["DeviceToken"], "Reminder" , 0, 0)
+            except:
+                print("ERROR Sending")
+                store_information.delete_item(
+                    Key={
+                    "ID" : Device["ID"] 
+                    }
+                )
+                pass
+            
             
 #Checks username and password
 def check_auth(username, password):
@@ -64,7 +74,8 @@ def requires_auth(f):
     return decorated
 
 #DynamoDB connection
-client = boto3.resource('dynamodb')
+client = boto3.resource('dynamodb', region_name='us-east-1')
+
 
 #Connection to the specific Tables  
 notification_records = client.Table('store_partner_notification')
@@ -93,13 +104,24 @@ def sendtheatro(StoreID, OrderID, Dev_Flag, TimeStamp):
         'OrderCreationDate' : TimeStamp
     }
     r = requests.post(url, headers = PARAMS, data = json.dumps(Body), auth = HTTPBasicAuth('notificationservice', 'PtQL[B3qn4y7GuWDfK;zN7Ee9gPu'))
-    print(Body)
+    
     return True
 
 @app.route('/')
 def hello():
     return jsonify({"Success" :True})
     
+@app.route('/deleteallreadnotifications', methods = ['DELETE'])
+@requires_auth
+def deleteallreadnotifications():
+    Notifications_Search = notification_records.scan( FilterExpression=Attr('ReadReceiptStatus').eq(1))
+    for notification in Notifications_Search["Items"]:
+        notification_records.delete_item(Key = {
+            "ID" : notification["ID"]
+        })
+    return jsonify({"Success" : True})
+
+
 @app.route('/deleteallnotifications', methods = ['DELETE'])
 @requires_auth
 def deleteallnotifications():
@@ -142,9 +164,10 @@ def addorder():
                 "NotificationCreationDate" : time.strftime('%x %X'),
                 "ReadReceiptStatus" : 0,
     }
-    #inset object into Dynamodb
-    if Payload["dev_flag"] == False:
-        notification_records.put_item(Item = BOPUS_Order)
+    #inset object into Dynamodb - commented out based on requirement from store Ops
+    # if Payload["dev_flag"] == False:
+    #     notification_records.put_item(Item = BOPUS_Order)
+
     response = store_information.scan( FilterExpression=Attr('StoreID').eq(Payload["StoreID"]) )
     #Find all devices attached to the specified store, and send notification - Try/except to skip if a notification error occurs
     if Payload["dev_flag"] == False:
@@ -163,14 +186,19 @@ def readnotification():
     StoreID = int(Payload["StoreID"])
     Notification_Search = notification_records.scan( FilterExpression=Attr('StoreID').eq(StoreID))    
     for notification in Notification_Search["Items"]:      
-        notification_records.update_item(
+        # notification_records.update_item(
+        #     Key= {
+        #         "ID" : notification["ID"]
+        #     },
+        #     UpdateExpression='SET ReadReceiptStatus = :val1',
+        # ExpressionAttributeValues={
+        #     ':val1': 1
+        # })
+        notification_records.delete_item(
             Key= {
                 "ID" : notification["ID"]
-            },
-            UpdateExpression='SET ReadReceiptStatus = :val1',
-        ExpressionAttributeValues={
-            ':val1': 1
-        })
+            }
+        )
     return jsonify({"Success" : True})
 
 #register device token
@@ -256,15 +284,17 @@ def CheckUnreadAlerts(StoreID):
             "ReadReceiptStatus" : int(Alert["ReadReceiptStatus"])
             }
         )
-    print(Unread_Alerts)
     return jsonify({"Success" : True , "Payload" :  Unread_Alerts})
 
 
 if __name__ == "__main__":
     #Configure the queue for resending notifications
-    app.config.from_object(Config())
-    scheduler = APScheduler()
-    scheduler.init_app(app)
-    scheduler.start()
+    # app.config.from_object(Config())
+    # scheduler = APScheduler()
+    # scheduler.init_app(app)
+    # scheduler.start()
+
+
+
     #Running the flask app
     app.run(host="0.0.0.0", ssl_context='adhoc') 
