@@ -81,10 +81,10 @@ client = boto3.resource('dynamodb', region_name='us-east-1')
 notification_records = client.Table('store_partner_notification')
 store_information = client.Table('store_information')
 
-def sendpushnotification(DeviceToken, OrderID, StoreID, dev_flag):
+def sendpushnotification(DeviceToken, OrderID, StoreID, dev_flag, Message):
     #send the push notification
     custom = {'launchURL': 'x-com.petco.wrapper.sim://launch' }
-    payload = Payload(alert= "New BOPUS order is ready", sound="popcorn.wav", badge=0, custom=custom)
+    payload = Payload(alert= Message, sound="popcorn.wav", badge=0, custom=custom)
     topic = 'com.petco.notifications'
     IOS_Client = APNsClient('./Apple_Certificate/server1.pem', use_sandbox= dev_flag, use_alternative_port=False)
     IOS_Client.send_notification(DeviceToken, payload, topic)
@@ -162,7 +162,40 @@ def addorder():
                 "OrderCreationDate" : Payload["OrderCreationDate"],
                 "StoreID" : int(Payload["StoreID"]),
                 "NotificationCreationDate" : time.strftime('%x %X'),
-                "ReadReceiptStatus" : 0,
+                "ReadReceiptStatus" : 0
+    }
+    #inset object into Dynamodb - commented out based on requirement from store Ops
+    # if Payload["dev_flag"] == False:
+    #     notification_records.put_item(Item = BOPUS_Order)
+
+    Message = "New BOPUS order is ready"
+ 
+    response = store_information.scan( FilterExpression=Attr('StoreID').eq(Payload["StoreID"]) )
+    #Find all devices attached to the specified store, and send notification - Try/except to skip if a notification error occurs
+    if Payload["dev_flag"] == False:
+        for Device in response['Items']: 
+            sendpushnotification(Device["DeviceToken"], Payload["OrderID"],Payload["StoreID"], False, Message)
+            
+  
+    sendtheatro(Payload["StoreID"],Payload["OrderID"], Payload["dev_flag"], Payload["OrderCreationDate"])        
+    return jsonify({"Success" : True})    
+
+
+
+#New order submitted from OMS
+@app.route('/sendTestNotfication', methods=['POST'])
+@requires_auth
+def sendTestNotfication():    
+    #change request received through endpoint to JSON
+    Payload = request.json
+    #create the insert object into DB
+    BOPUS_Order = {
+                "ID" : uuid.uuid4().hex,
+                "OrderID" : Payload["OrderID"],
+                "OrderCreationDate" : Payload["OrderCreationDate"],
+                "StoreID" : int(Payload["StoreID"]),
+                "NotificationCreationDate" : time.strftime('%x %X'),
+                "ReadReceiptStatus" : 0
     }
     #inset object into Dynamodb - commented out based on requirement from store Ops
     # if Payload["dev_flag"] == False:
@@ -172,11 +205,13 @@ def addorder():
     #Find all devices attached to the specified store, and send notification - Try/except to skip if a notification error occurs
     if Payload["dev_flag"] == False:
         for Device in response['Items']: 
-            sendpushnotification(Device["DeviceToken"], Payload["OrderID"],Payload["StoreID"], False)
+            sendpushnotification(Device["DeviceToken"], Payload["OrderID"],Payload["StoreID"], False, Payload["Message"])
             
   
     sendtheatro(Payload["StoreID"],Payload["OrderID"], Payload["dev_flag"], Payload["OrderCreationDate"])        
     return jsonify({"Success" : True})    
+
+
 
 #Indicate that the store received the notification
 @app.route('/readnotification', methods=['POST'])
