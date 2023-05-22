@@ -3,4 +3,4 @@ apns2<=0.3.0
 boto3<=1.6.14
 pyopenssl<=17.5.0
 flask_apscheduler<=1.8.0
-requests==2.21.0
+requests==2.31.0
